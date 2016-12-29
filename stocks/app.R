@@ -1,11 +1,9 @@
 library(quantmod)
-library(plotly)
-packageVersion('plotly')
 
 # TODO Separate Server and UI files 
 server <- function(input, output) {
   
-  dateButtons <- reactiveValues(data = 'last 3 months')
+  dateButtons <- reactiveValues(data = 'last 1 year')
   
   observeEvent(input$y1, {  dateButtons$data <- 'last 1 year'   })
   observeEvent(input$y3, {  dateButtons$data <- 'last 3 years'  })
@@ -34,25 +32,10 @@ server <- function(input, output) {
   
   output$mainPlot <- renderPlot({
       chartSeries(stockData(), theme = chartTheme("white"),  subset=dateButtons$data,
-                  type = "line", log.scale = FALSE, TA = c(addVo(),addBBands() ))
-      #addCCI(),addWPR() wiliams percentage , addROC() - rate of change, , addEVWMA(), addMACD()
+                  type = "line", log.scale = FALSE, TA = c(addROC(),addWPR() ))
   })
   
   #getFinancials Download and View Financial Statements
-  
-  #output$text1 <- renderText({ {paste("Output Stock: ", input$symb)}})
-  #output$text2 <- renderText({ {paste("Output Range: ", dateButtons$data)} })
-  
-  #output$fin <- getFin(input$symb,auto.assign = TRUE)
-  #output$stats <- renderPrint({ summary(rnorm(data) )  })
-  #output$plotlyPlot <- renderPlotly({
-  #  plot_ly(stockData(), x = ~mpg, y = ~wt)
-  #})
-  
-  #output$event <- renderPrint({
-  #  d <- event_data("plotly_hover")
-  #  if (is.null(d)) "Hover on a point!" else d
-  #})
 }
 
 ui <- fluidPage(
