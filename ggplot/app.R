@@ -3,17 +3,16 @@ library(ggplot2)
 library(shiny)
 
 server <- function(input, output) {
-  
+  # need to add this in a reactive expression and add multiple stocks
   stockData <- getSymbols("GOOG", src = "google",  auto.assign = FALSE)
   colnames(stockData) <- c("Open", "High", "Low", "Price", "Volume")
   dataInput = data.frame( Date = index(stockData), stockData)
-
-  dateButtons <- reactiveValues(data = '')
+  zoom <- reactiveValues(data = dataInput)
   
   #state array
-  arrayOfChange = as.data.frame(matrix(0, ncol=2, nrow=1))
+  arrayOfChange = as.data.frame(matrix( 0, ncol=2, nrow=1))
   names(arrayOfChange) = c( "State", "Data" )
-  stateData <- reactiveValues(states = 0)
+  stateData <- reactiveValues( states = 0 )
   arrayData <- reactiveValues( stateArray = arrayOfChange )
   
   data <- reactiveValues(newPoints = dataInput)
@@ -23,15 +22,11 @@ server <- function(input, output) {
     stateData$states <- stateData$states + 1
     arrayData$stateArray = rbind(arrayData$stateArray, c(stateData$states, nrow(data$newPoints) ))
   })
-
-  outputPlot <- ggplot(data = dataInput , aes(x= Date, y = Price ) ) + 
-        geom_line( colour = "#0072B2"  ) +
-        theme_bw()
  
   
   #start up plot
   output$zoomPlot <- renderPlot({
-    
+
     dat <- data.frame(x = numeric(0), y = numeric(0))
     withProgress(message = 'Making plot', value = 0, {
       # Number of times we'll go through the loop
@@ -50,7 +45,9 @@ server <- function(input, output) {
       }
     })
     
-    outputPlot
+    ggplot(data = zoom$data , aes(x= Date, y = Price ) ) + 
+      geom_line( colour = "#0072B2"  ) +
+      theme_bw()
     
   })
   
@@ -58,8 +55,6 @@ server <- function(input, output) {
   output$mainPlot <- renderPlot({
     ggplot(data = data$newPoints, aes(x= Date, y = Price ) ) + 
       geom_line( colour = "#0072B2"  ) +
-      #labs( title = "S&P 500 v2 (ggplot2::ggplot)") +
-      #guides(colour=FALSE) + 
       theme_bw() 
   })
   
@@ -76,14 +71,11 @@ server <- function(input, output) {
       keeprows <- nearPoints(data$newPoints, input$main_plot_click , xvar = "Date", yvar ="Price", threshold = 10, maxpoints = 1)
       print(subset(keeprows, select=c("Price", "Open", "High", "Low")))
     }
-    
   })
   
   output$financialsText <- renderTable({
-    
     x.f <- getFinancials("GOOG", "BS" , "A", auto.assign=FALSE)
     viewFinancials(x.f)
-    
   })
   
   #lapply(fin, function(x) x$IS$A["Operating Income", ] / x$IS$A["Total Revenue",])
@@ -93,23 +85,40 @@ server <- function(input, output) {
   #viewFinancials(co.f) 
   #print("-------------1")
   #print(head(co.f))
-  #output$financial <- renderDataTable (viewFinancials(co.f)) 
+  #output$financial <- renderDataTable (viewFinancials(co.f))
   
-  observeEvent(input$y1, {  data$newPoints <- subset(dataInput, Date > as.Date("2016-01-4") ) })
-  observeEvent(input$y5, {  data$newPoints <- subset(dataInput, Date > as.Date("2012-01-4") ) })
-  observeEvent(input$y10,{  data$newPoints <- subset(dataInput, Date > as.Date("2007-01-4") ) })
-  observeEvent(input$d3, {  data$newPoints <- subset(dataInput, Date > as.Date("2016-12-4") ) }) 
-  observeEvent(input$m3, {  data$newPoints <- subset(dataInput, Date > as.Date("2016-06-4") ) })
-  observeEvent(input$m6, {  data$newPoints <- subset(dataInput, Date > as.Date("2016-09-4") ) })
-  observeEvent(input$all,{  data$newPoints <- dataInput })
+  observeEvent(input$y1, {  zoom$data <- subset(dataInput, Date > as.Date("2016-01-4") )
+                            #stateData$states <- stateData$states + 1
+                            #arrayData$stateArray <- rbind(arrayData$stateArray, c(stateData$states, nrow(data$newPoint) ))
+                          })
+  observeEvent(input$y5, {  zoom$data <- subset(dataInput, Date > as.Date("2012-01-4") )
+                            #stateData$states <- stateData$states + 1
+                            #arrayData$stateArray <- rbind(arrayData$stateArray, c(stateData$states, nrow(data$newPoint) ))
+                          })
+  observeEvent(input$y10,{ zoom$data <- subset(dataInput, Date > as.Date("2007-01-4") ) 
+                            #stateData$states <- stateData$states + 1
+                            #arrayData$stateArray <- rbind(arrayData$stateArray, c(stateData$states, nrow(data$newPoint) ))
+                          })
+  observeEvent(input$m3, {  zoom$data <- subset(dataInput, Date > as.Date("2016-09-1") ) 
+                            #stateData$states <- stateData$states + 1
+                            #arrayData$stateArray = rbind(arrayData$stateArray, c(stateData$states, nrow(data$newPoint) ))
+                          })
+  observeEvent(input$m6, { zoom$data <- subset(dataInput, Date > as.Date("2016-06-1") ) 
+                            #stateData$states <- stateData$states + 1
+                            #arrayData$stateArray = rbind(arrayData$stateArray, c(stateData$states, nrow(data$newPoint) ))
+                          })
+  observeEvent(input$all,{  zoom$data <- dataInput 
+                            #stateData$states <- stateData$states + 1
+                            #arrayData$stateArray = rbind(arrayData$stateArray, c(stateData$states, nrow(data$newPoint)))
+                          })
 }
 
 
 ui <- fluidPage(
-  h1("Stockmarket View of Data" , align = "center"),
+  h3("Stockmarket View of Data" , align = "center"),
   hr(),
   sidebarLayout(
-    sidebarPanel( h2("Information of Selected point"),
+    sidebarPanel( h3("Information of Selected point"),
                   verbatimTextOutput("infoOfPoint"),  
                   h3("Results of Interactions"), 
                   p("Amount of information in each state of the system"), 
@@ -117,9 +126,23 @@ ui <- fluidPage(
                   width = 4),
   
   mainPanel(
-    # need to allow these to set brushing distance
+    # TODO add navbar ? for currency also?
+    fluidRow( column(1, p("Stock selection:") ),
+              column(7, selectInput("select", label = NULL,  choices = list("GOOG" = 1, "AMZN" = 2, "FTSE" = 3), 
+                                                        selected = 1)
+                        )
+              ),
+    
+    fluidRow( column(12, plotOutput("mainPlot", hover = "main_plot_hover" , click = "main_plot_click"))),
+    fluidRow( column(12, plotOutput("zoomPlot", 
+                              hover = "plot_hover",
+                              brush = brushOpts(id = "plot_brush", fill = "#ccc", direction = "x", resetOnNew = FALSE),
+                              height= "150"
+                          )
+            )
+    ),
     fluidRow( column(7, 
-                     actionButton("d3", "3D"),
+                     h4("Define time period of enquiry:"),
                      actionButton("w1", "1W"),
                      actionButton("M3", "3M"), 
                      actionButton("m6", "6M"),
@@ -127,15 +150,7 @@ ui <- fluidPage(
                      actionButton("y5", "5Y"),
                      actionButton("y10", "10Y"),
                      actionButton("all", "All")
-                )),
-    fluidRow( column(12, plotOutput("mainPlot", hover = "main_plot_hover" , click = "main_plot_click"))),
-    fluidRow( column(12, plotOutput("zoomPlot", 
-                              hover = "plot_hover",
-                              brush = brushOpts(id = "plot_brush", fill = "#ccc", direction = "x"),
-                              height= "150"
-                          )
-            )
-      )
+     ))
     ), 
   position = "right"
   )
