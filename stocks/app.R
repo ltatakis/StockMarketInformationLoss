@@ -36,6 +36,7 @@ server <- function(input, output) {
   })
   
   #getFinancials Download and View Financial Statements
+ 
 }
 
 ui <- fluidPage(
