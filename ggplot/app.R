@@ -8,7 +8,7 @@ server <- function(input, output) {
   colnames(stockData) <- c("Open", "High", "Low", "Price", "Volume")
   dataInput = data.frame( Date = index(stockData), stockData)
   zoom <- reactiveValues(data = dataInput)
-  
+   
   #state array
   arrayOfChange = as.data.frame(matrix( 0, ncol=2, nrow=1))
   names(arrayOfChange) = c( "State", "Data" )
