@@ -1,6 +1,16 @@
 library(quantmod)
 library(ggplot2)
 library(shiny)
+library(lubridate)
+
+#
+# TODO Need to update main plot with each change of dataset
+# How will that impact interaction view graph
+# Start looking if you can add some entropy from chens paper
+# Maybe add a toggle to add some of quantmod extra graphs for show :)
+# Entropy - and comparison of other metrics - eg number of rows to see comparisons with entropy
+# If data selected is less than a week nothing is shown - show message !
+#         if selected area of data is less date range than selected button --> reset selection
 
 server <- function(input, output) {
   # need to add this in a reactive expression and add multiple stocks
@@ -13,27 +23,23 @@ server <- function(input, output) {
     stockData <- getSymbols(input$select, src = outputSrc,  auto.assign = FALSE)
     colnames(stockData) <- c("Open", "High", "Low", "Price", "Volume")
     data.frame( Date = index(stockData), stockData)
-    
   })
-  zoom <- reactiveValues(data = NULL )
-  #state array
-   
-  arrayOfChange = as.data.frame(matrix( 0, ncol=2, nrow=1))
-  names(arrayOfChange) = c( "State", "Data" )
-  stateData <- reactiveValues( states = 0 )
-  arrayData <- reactiveValues( stateArray = arrayOfChange )
-  #initialValueForNewPoints <-  getSymbData()
   
+  zoom <- reactiveValues(data = NULL)
+   
+  initialArrayForInfoChange = as.data.frame(matrix( 0, ncol=2, nrow=1))
+  names(initialArrayForInfoChange) = c( "State", "Data" )
+  stateValues <- reactiveValues( states = 0 )
+  arrayOfInfoChangeData <- reactiveValues( stateArray = initialArrayForInfoChange )
+
   #Initial values for main plot
-  data <- reactiveValues(
-    newPoints = NULL
-   )
+  data <- reactiveValues( newPoints = NULL )
   
   observeEvent(input$plot_brush, {
     mainData <- getSymbData()
     data$newPoints <-  brushedPoints(mainData, input$plot_brush, "Date", "Price") 
-    stateData$states <- stateData$states + 1
-    arrayData$stateArray = rbind(arrayData$stateArray, c(stateData$states, nrow(data$newPoints) ))
+    stateValues$states <- stateValues$states + 1
+    arrayOfInfoChangeData$stateArray = rbind(arrayOfInfoChangeData$stateArray, c(stateValues$states, nrow(data$newPoints) ))
   })
  
   
@@ -58,10 +64,10 @@ server <- function(input, output) {
       }
     })
     
-    if(is.null(zoom$data)) queryData = getSymbData()
-    else queryData = zoom$data
+    if(is.null(zoom$data)) zoomPlotDataToDisplay = getSymbData()
+    else zoomPlotDataToDisplay = zoom$data
     
-    ggplot(data = queryData , aes(x= Date, y = Price ) ) + 
+    ggplot(data = zoomPlotDataToDisplay , aes(x= Date, y = Price ) ) + 
       geom_line( colour = "#0072B2"  ) +
       theme_bw()
     
@@ -69,7 +75,7 @@ server <- function(input, output) {
   
   
   output$mainPlot <- renderPlot({
-    if(is.null(data$newPoints)) data$newPoints =  getSymbData()
+    if(is.null(data$newPoints)) data$newPoints = getSymbData()
     
     ggplot(data = data$newPoints, aes(x=Date, y = Price ) ) + 
       geom_line( colour = "#0072B2"  ) +
@@ -77,7 +83,7 @@ server <- function(input, output) {
   })
   
   output$stateChangePlot <- renderPlot({
-    ggplot(data = arrayData$stateArray, aes(x= State, y = Data ) ) + 
+    ggplot(data = arrayOfInfoChangeData$stateArray, aes(x= State, y = Data ) ) + 
       geom_line( colour = "#0072B2"  ) +
       labs( title = "Amount of information shown in the main plot due to interactions by the user") +
       theme_bw() 
@@ -98,17 +104,17 @@ server <- function(input, output) {
   
   
   
-  observeEvent(input$y1, {  zoom$data <- subset(getSymbData(), Date > as.Date("2016-01-4") )
-                          })
-  observeEvent(input$y5, {  zoom$data <- subset(getSymbData(), Date > as.Date("2012-01-4") )
-                          })
-  observeEvent(input$y10,{ zoom$data <- subset(getSymbData(), Date > as.Date("2007-01-4") ) 
-                          })
-  observeEvent(input$m3, {  zoom$data <- subset(getSymbData(), Date > as.Date("2016-09-1") ) 
-                          })
-  observeEvent(input$m6, { zoom$data <- subset(getSymbData(), Date > as.Date("2016-06-1") ) 
-                          })
+  observeEvent(input$y1, {  zoom$data <- subset(getSymbData(), Date > as.Date( ymd(Sys.Date()) - years(1)) ) })
+  observeEvent(input$y5, {  zoom$data <- subset(getSymbData(), Date > as.Date( ymd(Sys.Date()) - years(5)) )})
+  observeEvent(input$y10,{  zoom$data <- subset(getSymbData(), Date > as.Date( ymd(Sys.Date()) - years(10)) ) })
+  observeEvent(input$m3, {  zoom$data <- subset(getSymbData(), Date > as.Date( ymd(Sys.Date()) - months(3)) ) })
+  observeEvent(input$m6, {  zoom$data <- subset(getSymbData(), Date > as.Date( ymd(Sys.Date()) - months(6)) ) })
+  observeEvent(input$w1, {  zoom$data <- subset(getSymbData(), Date > as.Date( ymd(Sys.Date()) - weeks(1)) ) })
   observeEvent(input$all,{  zoom$data <- getSymbData() })
+  
+  #hacky
+  observeEvent(input$select,{  data$newPoints <- NULL })
+  
 }
 
 
@@ -144,7 +150,7 @@ ui <- fluidPage(
     fluidRow( column(7, 
                      h4("Define time period of enquiry:"),
                      actionButton("w1", "1W"),
-                     actionButton("M3", "3M"), 
+                     actionButton("m3", "3M"), 
                      actionButton("m6", "6M"),
                      actionButton("y1", "1Y"),
                      actionButton("y5", "5Y"),
@@ -154,9 +160,6 @@ ui <- fluidPage(
     ), 
   position = "right"
   )
-  #, dataTableOutput("table"))
-  #sidebarPanel(tableOutput("financialsText"), width = 3)
-  #sidebarPanel(tableOutput("earnings"), width = 3)
 )
 
 
